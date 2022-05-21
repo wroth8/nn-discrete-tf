@@ -10,17 +10,20 @@ class QuinaryWeights(WeightType):
 
     def __init__(self,
                  regularize_shayer=0.0,
+                 enable_sampled_weights=False,
                  q_logit_constraints=(float('-inf'), float('+inf'))):
 
         super(WeightType, self).__init__()
         assert regularize_shayer >= 0.0
         assert q_logit_constraints is None or (isinstance(q_logit_constraints, tuple) and len(q_logit_constraints) == 2)
         self.regularize_shayer = regularize_shayer
+        self.enable_sampled_weights = enable_sampled_weights # setting this to False saves the memory for the sampled weights
         q_logit_constraints = (None, None) if q_logit_constraints is None else q_logit_constraints
         q_logit_constraints = (None if q_logit_constraints[0] == float('-inf') else q_logit_constraints[0],
                                None if q_logit_constraints[1] == float('+inf') else q_logit_constraints[1])
         self.q_logit_constraints = q_logit_constraints
         self.q_logits = None
+        self.w_sampled = None
         self.shape = None
 
 
@@ -54,6 +57,9 @@ class QuinaryWeights(WeightType):
         if self.q_logits.shape != self.shape:
             raise Exception('Incorrect shapes: self.q_logits.shape={}, self.shape={}'.format(
                     self.q_logits.shape, self.shape))
+
+        if self.enable_sampled_weights:
+            self.w_sampled = tf.Variable(np.zeros(self.shape[:-1]), trainable=False, name='QuinaryWeightsSampled', dtype=self.q_logits.dtype)
 
 
     def apply_losses(self):
@@ -100,3 +106,17 @@ class QuinaryWeights(WeightType):
     def most_probable(self):
         w_mp = (tf.cast(tf.math.argmax(self.q_logits, axis=-1), self.q_logits.dtype) - 2.0) * 0.5
         return w_mp
+
+
+    def resample_weights(self):
+        assert self.enable_sampled_weights
+        assert self.w_sampled is not None # model not initialized?
+        w_resampled = (tf.cast(tf.random.categorical(tf.reshape(self.q_logits, [-1, 5]), 1), self.q_logits.dtype) - 2.0) * 0.5
+        w_resampled = tf.reshape(w_resampled, self.shape[:-1])
+        self.w_sampled.assign(w_resampled)
+
+
+    def sampled(self):
+        assert self.enable_sampled_weights
+        assert self.w_sampled is not None # model not initialized?
+        return self.w_sampled

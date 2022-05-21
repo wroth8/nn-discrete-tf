@@ -25,3 +25,9 @@ class WeightType(tf.keras.layers.Layer):
     
     def most_probable(self):
         raise NotImplementedError('\'most_probable()\' must be implemented by subclass')
+
+    def resample_weights(self):
+        raise NotImplementedError('\'resample_weights()\' must be implemented by subclass')
+
+    def sampled(self):
+        raise NotImplementedError('\'sampled()\' must be implemented by subclass')

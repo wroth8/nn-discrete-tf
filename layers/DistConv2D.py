@@ -39,7 +39,8 @@ class DistConv2D(tf.keras.layers.Layer):
             raise NotImplementedError('DistConv2D: Data format \'{}\' not implemented'.format(data_format))
 
 
-    def call(self, x, training):
+    def call(self, x, training, use_sampled_weights=False):
+        assert not (use_sampled_weights and training) # sampled weights can only be used for predictions
         if training:
             self.dist_weights.apply_losses() # Apply regularization
             if isinstance(x, tuple):
@@ -48,7 +49,7 @@ class DistConv2D(tf.keras.layers.Layer):
             else:
                 return self.call_train_deterministic(x)
         else:
-            return self.call_predict(x)
+            return self.call_predict(x, use_sampled_weights=use_sampled_weights)
 
 
     def call_train_deterministic(self, x_in):
@@ -100,11 +101,18 @@ class DistConv2D(tf.keras.layers.Layer):
         return x_out_mean, x_out_var
 
 
-    def call_predict(self, x_in):
-        w_mp = self.dist_weights.most_probable()
-        x_out = tf.nn.conv2d(x_in, w_mp, self.strides, self.padding, data_format=self.data_format)
+    def call_predict(self, x_in, use_sampled_weights=False):
+        if use_sampled_weights:
+            w = self.dist_weights.sampled()
+        else:
+            w = self.dist_weights.most_probable()
+        x_out = tf.nn.conv2d(x_in, w, self.strides, self.padding, data_format=self.data_format)
         if self.enable_activation_normalization:
             x_out = x_out * (float(self.channels_in * self.kernel_size[0] * self.kernel_size[1]) ** -0.5)
         if self.use_bias:
             x_out = x_out + self.bias
         return x_out
+
+
+    def resample_weights(self):
+        self.dist_weights.resample_weights()

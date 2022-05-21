@@ -28,7 +28,8 @@ class DistDense(tf.keras.layers.Layer):
             self.bias = tf.Variable(tf.zeros(shape=(self.units_out,)))
 
 
-    def call(self, x, training):
+    def call(self, x, training, use_sampled_weights=False):
+        assert not (use_sampled_weights and training) # sampled weights can only be used for predictions
         if training:
             self.dist_weights.apply_losses() # Apply regularization
             if isinstance(x, tuple):
@@ -37,7 +38,7 @@ class DistDense(tf.keras.layers.Layer):
             else:
                 return self.call_train_deterministic(x)
         else:
-            return self.call_predict(x)
+            return self.call_predict(x, use_sampled_weights=use_sampled_weights)
 
 
     def call_train_deterministic(self, x_in):
@@ -80,11 +81,18 @@ class DistDense(tf.keras.layers.Layer):
         return x_out_mean, x_out_var
 
 
-    def call_predict(self, x_in):
-        w_mp = self.dist_weights.most_probable()
-        x_out = tf.matmul(x_in, w_mp)
+    def call_predict(self, x_in, use_sampled_weights=False):
+        if use_sampled_weights:
+            w = self.dist_weights.sampled()
+        else:
+            w = self.dist_weights.most_probable()
+        x_out = tf.matmul(x_in, w)
         if self.enable_activation_normalization:
             x_out = x_out * (float(self.units_in) ** -0.5)
         if self.use_bias:
             x_out = x_out + self.bias
         return x_out
+
+
+    def resample_weights(self):
+        self.dist_weights.resample_weights()
