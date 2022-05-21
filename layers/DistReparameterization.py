@@ -1,14 +1,20 @@
 import tensorflow as tf
 
+from layers.ste import sign_ste_id # TODO: get rid of 'layers.' prefix
 
 class DistReparameterization(tf.keras.layers.Layer):
 
-    def __init__(self, mode='NORMAL', gumbel_softmax_temperature=1.0, epsilon=1e-6):
+    def __init__(self,
+            mode='NORMAL',
+            gumbel_softmax_temperature=1.0,
+            enable_straight_through_estimator=False,
+            epsilon=1e-6):
         super(DistReparameterization, self).__init__()
         mode = mode.upper()
         assert mode in ['NORMAL', 'GUMBEL_SOFTMAX_SIGN', 'GUMBEL_SOFTMAX_BINARY']
         self.mode = mode
         self.gumbel_softmax_temperature = 1.0
+        self.enable_straight_through_estimator = enable_straight_through_estimator
         self.epsilon = epsilon
 
 
@@ -40,6 +46,8 @@ class DistReparameterization(tf.keras.layers.Layer):
             logits_sample = logits + noise_gumbel
             logits_delta = (logits_sample[1,...] - logits_sample[0,...]) * (0.5 / self.gumbel_softmax_temperature)
             x_out = tf.math.tanh(logits_delta)
+            if self.enable_straight_through_estimator:
+                x_out = sign_ste_id(x_out)
         elif self.mode == 'GUMBEL_SOFTMAX_BINARY':
             raise NotImplementedError('DistReparameterization: Reparameterization mode \'{}\' not tested'.format(self.mode))
             probs = T.stack([1.0 - x_in_mean, x_in_mean], axis=0)
@@ -49,6 +57,8 @@ class DistReparameterization(tf.keras.layers.Layer):
             logits_sample = logits + noise_gumbel
             logits_delta = (logits_sample[1,...] - logits_sample[0,...]) * (1.0 / self.gumbel_softmax_temperature)
             x_out = tf.math.sigmoid(logits_delta)
+            if self.enable_straight_through_estimator:
+                raise NotImplementedError('DistReparameterization: STE for binary outputs not implemented')
             # OLD: Theano implementation
             # aux = T.stack([1.-x_in_mean, x_in_mean], axis=0)
             # logits = T.log(aux + max(1e-6, self._epsilon_reparameterization))
