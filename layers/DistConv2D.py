@@ -8,7 +8,8 @@ class DistConv2D(tf.keras.layers.Layer):
                  dist_weights,
                  use_bias=True,
                  enable_activation_normalization=False,
-                 data_format='NHWC'):
+                 data_format='NHWC',
+                 enable_safe_variance=False):
         super(DistConv2D, self).__init__()
         self.channels_out = filters
         self.channels_in = None
@@ -19,6 +20,7 @@ class DistConv2D(tf.keras.layers.Layer):
         self.padding = 'SAME'
         self.enable_activation_normalization = enable_activation_normalization
         self.data_format = data_format
+        self.enable_safe_variance = enable_safe_variance
 
 
     def build(self, input_shape):
@@ -62,6 +64,9 @@ class DistConv2D(tf.keras.layers.Layer):
             w_mean, w_var = self.dist_weights.expectation_and_variance()
             x_out_mean = tf.nn.conv2d(x_in, w_mean, self.strides, self.padding, data_format=self.data_format)
             x_out_var = tf.nn.conv2d(x_in ** 2.0, w_var, self.strides, self.padding, data_format=self.data_format)
+            if self.enable_safe_variance:
+                # x_out_var CAN be negative here: https://github.com/pytorch/pytorch/issues/30934
+                x_out_var = tf.nn.relu(x_out_var) # faster than tf.maximum(x_out_var, 0.0)
             if self.enable_activation_normalization:
                 x_out_mean = x_out_mean * (float(self.channels_in * self.kernel_size[0] * self.kernel_size[1]) ** -0.5)
                 x_out_var = x_out_var * (float(self.channels_in * self.kernel_size[0] * self.kernel_size[1]) ** -1.0)
@@ -75,12 +80,18 @@ class DistConv2D(tf.keras.layers.Layer):
             w_mean = self.dist_weights.expectation()
             x_out_mean = tf.nn.conv2d(x_in_mean, w_mean, self.strides, self.padding, data_format=self.data_format)
             x_out_var = tf.nn.conv2d(x_in_var, w_mean ** 2.0, self.strides, self.padding, data_format=self.data_format)
+            if self.enable_safe_variance:
+                # x_out_var CAN be negative here: https://github.com/pytorch/pytorch/issues/30934
+                x_out_var = tf.nn.relu(x_out_var) # faster than tf.maximum(x_out_var, 0.0)
         else:
             w_mean, w_var = self.dist_weights.expectation_and_variance()
             x_out_mean = tf.nn.conv2d(x_in_mean, w_mean, self.strides, self.padding, data_format=self.data_format)
             x_out_var = tf.nn.conv2d(x_in_mean ** 2.0, w_var, self.strides, self.padding, data_format=self.data_format) + \
                         tf.nn.conv2d(x_in_var, w_mean ** 2.0, self.strides, self.padding, data_format=self.data_format) + \
                         tf.nn.conv2d(x_in_var, w_var, self.strides, self.padding, data_format=self.data_format)
+            if self.enable_safe_variance:
+                # x_out_var CAN be negative here: https://github.com/pytorch/pytorch/issues/30934
+                x_out_var = tf.nn.relu(x_out_var) # faster than tf.maximum(x_out_var, 0.0)
         if self.enable_activation_normalization:
             x_out_mean = x_out_mean * (float(self.channels_in * self.kernel_size[0] * self.kernel_size[1]) ** -0.5)
             x_out_var = x_out_var * (float(self.channels_in * self.kernel_size[0] * self.kernel_size[1]) ** -1.0)
