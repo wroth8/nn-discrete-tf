@@ -37,10 +37,14 @@ class RealWeights(WeightType):
         else:
             raise NotImplementedError('Shape with {} dimensions not supported'.format(len(shape)))
 
+        LAMBDA = lambda:0 # required to check if we got a lambda: https://stackoverflow.com/questions/3655842/how-can-i-test-whether-a-variable-holds-a-lambda
         if self.initializer == 'glorot_uniform':
             # Glorot uniform
             r = (6.0 / (fan_in + fan_out)) ** 0.5
             self.w = tf.Variable(tf.random.uniform(shape, minval=-r, maxval=r), trainable=True, name='RealWeights')
+        elif isinstance(self.initializer, type(LAMBDA)) and self.initializer.__name__ == LAMBDA.__name__:
+            # We expect a lambda that takes inputs (shape,fan_in,fan_out) and creates a tf tensor of the given shape
+            self.w = self.initializer(shape, fan_in, fan_out)
         else:
             raise NotImplementedError('Initializer \'{}\' not implemented'.format(self.initializer))
 

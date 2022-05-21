@@ -33,6 +33,7 @@ class DistSign(tf.keras.layers.Layer):
             else:
                 return self.call_train_deterministic(x)
         else:
+            assert not isinstance(x, tuple)
             return self.call_predict(x)
 
 

@@ -4,14 +4,15 @@ import numpy as np
 
 # from WeightType import WeightType
 from layers.weights.WeightType import WeightType # TODO: Check why we have to specify the whole path and cannot leave out 'layers.weights.'
-from layers.weights.initializers import initialize_probabilities_from_expectation, map_to_ecdf
+from layers.weights.initializers import initialize_probabilities_from_expectation, initialize_shayer_probabilities_from_expectation, map_to_ecdf
 
 class TernaryWeights(WeightType):
 
     def __init__(self,
                  regularize_shayer=0.0,
                  enable_unsafe_variance=False,
-                 q_logit_constraints=(float('-inf'), float('+inf'))):
+                 q_logit_constraints=(float('-inf'), float('+inf')),
+                 initializer_mode='default'):
         '''
         enable_unsafe_variance: If set to true, the variances are computed in a more efficient way, but we cannot
           guarantee that the resulting values will be non-negative (`catastrophic cancellation`). In particular, we used
@@ -28,6 +29,10 @@ class TernaryWeights(WeightType):
         q_logit_constraints = (None if q_logit_constraints[0] == float('-inf') else q_logit_constraints[0],
                                None if q_logit_constraints[1] == float('+inf') else q_logit_constraints[1])
         self.q_logit_constraints = q_logit_constraints
+        if initializer_mode is None:
+            initializer_mode = 'default'
+        assert initializer_mode in ['default', 'roth', 'roth_without_normalization', 'shayer', 'shayer_without_normalization']
+        self.initializer_mode = initializer_mode
         self.q_logits = None
         self.shape = None
 
@@ -35,13 +40,32 @@ class TernaryWeights(WeightType):
     def initialize_weights(self, shape, initializer_logits='uniform'):
         self.shape = shape + (3,)
         if isinstance(initializer_logits, WeightType):
-            w_expect = initializer_logits.expectation().numpy()
-            # Use the empirical cdf to `stretch` the expected values
-            idx_neg = w_expect <= 0.0
-            idx_pos = np.logical_not(idx_neg)
-            w_expect[idx_neg] = map_to_ecdf(w_expect[idx_neg]) * 1.5 - 1.5
-            w_expect[idx_pos] = map_to_ecdf(w_expect[idx_pos]) * 1.5
-            q_values = initialize_probabilities_from_expectation(w_expect, [-1.0, 0.0, 1.0])
+            if self.initializer_mode in ['default', 'roth']:
+                w_expect = initializer_logits.expectation().numpy()
+                # Use the empirical cdf to `stretch` the expected values
+                idx_neg = w_expect <= 0.0
+                idx_pos = np.logical_not(idx_neg)
+                w_expect[idx_neg] = map_to_ecdf(w_expect[idx_neg]) * 1.5 - 1.5
+                w_expect[idx_pos] = map_to_ecdf(w_expect[idx_pos]) * 1.5
+                q_values = initialize_probabilities_from_expectation(w_expect, [-1.0, 0.0, 1.0])
+            elif self.initializer_mode == 'roth_without_normalization':
+                w_expect = initializer_logits.expectation().numpy()
+                q_values = initialize_probabilities_from_expectation(w_expect, [-1.0, 0.0, 1.0])
+            elif self.initializer_mode == 'shayer':
+                w_expect = initializer_logits.expectation().numpy()
+                w_expect = w_expect / np.std(w_expect)
+                q_zro_values, q_cond_pos_values = initialize_shayer_probabilities_from_expectation(w_expect, [-1.0, 0.0, 1.0])
+                q_values = np.stack([(1.0 - q_zro_values) * (1.0 - q_cond_pos_values),
+                                     q_zro_values,
+                                     (1.0 - q_zro_values) * q_cond_pos_values], axis=-1)
+            elif self.initializer_mode == 'shayer_without_normalization':
+                w_expect = initializer_logits.expectation().numpy()
+                q_zro_values, q_cond_pos_values = initialize_shayer_probabilities_from_expectation(w_expect, [-1.0, 0.0, 1.0])
+                q_values = np.stack([(1.0 - q_zro_values) * (1.0 - q_cond_pos_values),
+                                     q_zro_values,
+                                     (1.0 - q_zro_values) * q_cond_pos_values], axis=-1)
+            else:
+                raise NotImplementedError('Initializer mode \'{}\' not implemented'.format(self.initializer_mode))
         elif initializer_logits == 'uniform':
             q_values = tf.random.uniform(self.shape, minval=-1.0, maxval=1.0)
             q_values = tf.math.softmax(q_values, axis=-1)
