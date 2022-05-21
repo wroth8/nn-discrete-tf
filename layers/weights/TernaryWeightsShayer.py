@@ -10,6 +10,7 @@ class TernaryWeightsShayer(WeightType):
 
     def __init__(self,
                  regularize_shayer=0.0,
+                 enable_sampled_weights=False,
                  enable_unsafe_variance=False,
                  q_logit_constraints=(float('-inf'), float('+inf')),
                  initializer_mode='default'):
@@ -25,6 +26,7 @@ class TernaryWeightsShayer(WeightType):
         assert regularize_shayer >= 0.0
         assert q_logit_constraints is None or (isinstance(q_logit_constraints, tuple) and len(q_logit_constraints) == 2)
         self.regularize_shayer = regularize_shayer
+        self.enable_sampled_weights = enable_sampled_weights # setting this to False saves the memory for the sampled weights
         self.enable_unsafe_variance = enable_unsafe_variance
         q_logit_constraints = (None, None) if q_logit_constraints is None else q_logit_constraints
         q_logit_constraints = (None if q_logit_constraints[0] == float('-inf') else q_logit_constraints[0],
@@ -100,6 +102,10 @@ class TernaryWeightsShayer(WeightType):
             raise Exception('Incorrect shapes: self.q_cond_pos_logits.shape={}, self.shape={}'.format(
                     self.q_cond_pos_logits.shape, self.shape))
 
+        if self.enable_sampled_weights:
+            self.w_sampled = tf.Variable(np.zeros(self.shape), trainable=False, name='TernaryWeightsSampled', dtype=self.q_zro_logits.dtype)
+
+
     def apply_losses(self):
         if self.regularize_shayer > 0.0:
             self.add_loss((tf.reduce_sum(self.q_zro_logits ** 2.0) +
@@ -173,3 +179,23 @@ class TernaryWeightsShayer(WeightType):
         w_mp = tf.cast(tf.math.argmax(w_probs, axis=-1), w_probs.dtype) - 1.0
         return w_mp
 
+
+    def resample_weights(self):
+        assert self.enable_sampled_weights
+        assert self.w_sampled is not None # model not initialized?
+        q_zro = tf.math.sigmoid(self.q_zro_logits)
+        q_cond_pos = tf.math.sigmoid(self.q_cond_pos_logits)
+        epsilon = 1e-6
+        q_logits = tf.stack([
+                tf.math.log(1.0 - q_zro + epsilon) + tf.math.log(1.0 - q_cond_pos + epsilon),
+                tf.math.log(q_zro + epsilon),
+                tf.math.log(1.0 - q_zro + epsilon) + tf.math.log(q_cond_pos + epsilon)], axis=-1)
+        w_resampled = tf.cast(tf.random.categorical(tf.reshape(q_logits, [-1, 3]), 1), self.q_zro_logits.dtype) - 1.0
+        w_resampled = tf.reshape(w_resampled, self.shape)
+        self.w_sampled.assign(w_resampled)
+
+
+    def sampled(self):
+        assert self.enable_sampled_weights
+        assert self.w_sampled is not None # model not initialized?
+        return self.w_sampled
