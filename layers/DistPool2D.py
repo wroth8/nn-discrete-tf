@@ -41,7 +41,7 @@ class DistPool2D(tf.keras.layers.Layer):
         if strides is None:
             strides = pool_size
 
-        assert mode in ['MAX', 'MAX_SIGN']
+        assert mode in ['MAX', 'MAX_SIGN', 'MAX_MEAN', 'MAX_SAMPLE']
         assert padding in ['VALID', 'SAME']
         assert data_format == 'NHWC'
 
@@ -65,7 +65,7 @@ class DistPool2D(tf.keras.layers.Layer):
 
     
     def call_train_deterministic(self, x_in, enable_ema_updates):
-        assert self.mode in ['MAX', 'MAX_SIGN']
+        assert self.mode in ['MAX', 'MAX_SIGN', 'MAX_MEAN', 'MAX_SAMPLE']
         return tf.nn.max_pool(x_in, self.pool_size, self.strides, padding=self.padding, data_format=self.data_format)
 
 
@@ -91,6 +91,7 @@ class DistPool2D(tf.keras.layers.Layer):
             raise NotImplementedError('DistPool2D: Padding \'{}\' not implemented'.format(self.padding))
         
         if self.mode == 'MAX':
+            assert pool_W == 2 and pool_H == 2 # current implementation only supports 2x2 pooling
             m, v = tf.transpose(x_in_mean, [0, 3, 1, 2]), tf.transpose(x_in_var, [0, 3, 1, 2]) # NCHW
             m, v = tf.reshape(m, [-1, pool_W]), tf.reshape(v, [-1, pool_W])
             m, v = maxOfGaussians(m[:, 0], v[:, 0], m[:, 1], v[:, 1], epsilon=self.epsilon)
@@ -101,6 +102,7 @@ class DistPool2D(tf.keras.layers.Layer):
             m, v = tf.reshape(m, [N, C, W // pool_W, H // pool_H]), tf.reshape(v, [N, C, W // pool_W, H // pool_H])
             x_out_mean, x_out_var = tf.transpose(m, [0, 3, 2, 1]), tf.transpose(v, [0, 3, 2, 1]) # NHWC
         elif self.mode == 'MAX_SIGN':
+            assert pool_W == 2 and pool_H == 2 # current implementation only supports 2x2 pooling
             # Note: We also tried first transposing with [0, 3, 2, 1] instead of [0, 3, 1, 2] and we found [0, 3, 1, 2]
             # to be marginally faster.
             m = (1.0 - x_in_mean) * 0.5 # Convert m to p(w = -1)
@@ -115,12 +117,45 @@ class DistPool2D(tf.keras.layers.Layer):
             m = tf.reshape(m, [N, C, W // pool_W, H // pool_H])
             m = tf.transpose(m, [0, 3, 2, 1]) # NHWC
             x_out_mean, x_out_var = m, 1.0 - tf.square(m) + max(1e-6, self.epsilon)
+        elif self.mode == 'MAX_MEAN':
+            # Compute maximum mean of pooling region and pass corresponding mean and variance
+            m, v = tf.transpose(x_in_mean, [0, 3, 1, 2]), tf.transpose(x_in_var, [0, 3, 1, 2]) # convert to NCHW
+            m, v = tf.reshape(m, [N, C, H, W // pool_W, pool_W]), tf.reshape(v, [N, C, H, W // pool_W, pool_W])
+            m, v = tf.transpose(m, [0, 1, 3, 4, 2]), tf.transpose(v, [0, 1, 3, 4, 2])
+            assert m.shape == (N, C, W // pool_W, pool_W, H) and m.shape == v.shape
+
+            m, v = tf.reshape(m, [N, C, W // pool_W, pool_W, H // pool_H, pool_H]), tf.reshape(v, [N, C, W // pool_W, pool_W, H // pool_H, pool_H])
+            m, v = tf.transpose(m, [0, 4, 2, 1, 3, 5]), tf.transpose(v, [0, 4, 2, 1, 3, 5])
+            assert m.shape == (N, H // pool_H, W // pool_W, C, pool_W, pool_H) and m.shape == v.shape
+
+            m, v = tf.reshape(m, [-1, pool_W * pool_H]), tf.reshape(v, [-1, pool_W * pool_H])
+            max_idx = tf.argmax(m, axis=1) # select argmax along last dimension
+            m, v = tf.gather(m, max_idx, axis=1, batch_dims=1), tf.gather(v, max_idx, axis=1, batch_dims=1)
+            x_out_mean, x_out_var = tf.reshape(m, [N, H // pool_H, W // pool_W, C]), tf.reshape(v, [N, H // pool_H, W // pool_W, C]) # convert back to NHWC
+        elif self.mode == 'MAX_SAMPLE':
+            # Sample according to mean and variance, compute maximum sample of pooling region, and pass mean and variance of maximum sample
+            # This method is used in "J.W.T. Peters and M. Welling: Probabilistic binary neural networks, 2018"
+            m, v = tf.transpose(x_in_mean, [0, 3, 1, 2]), tf.transpose(x_in_var, [0, 3, 1, 2]) # convert to NCHW
+            m, v = tf.reshape(m, [N, C, H, W // pool_W, pool_W]), tf.reshape(v, [N, C, H, W // pool_W, pool_W])
+            m, v = tf.transpose(m, [0, 1, 3, 4, 2]), tf.transpose(v, [0, 1, 3, 4, 2])
+            assert m.shape == (N, C, W // pool_W, pool_W, H) and m.shape == v.shape
+
+            m, v = tf.reshape(m, [N, C, W // pool_W, pool_W, H // pool_H, pool_H]), tf.reshape(v, [N, C, W // pool_W, pool_W, H // pool_H, pool_H])
+            m, v = tf.transpose(m, [0, 4, 2, 1, 3, 5]), tf.transpose(v, [0, 4, 2, 1, 3, 5])
+            assert m.shape == (N, H // pool_H, W // pool_W, C, pool_W, pool_H) and m.shape == v.shape
+
+            m, v = tf.reshape(m, [-1, pool_W * pool_H]), tf.reshape(v, [-1, pool_W * pool_H])
+            sample = tf.random.normal(m.shape) * tf.sqrt(v) + m
+            sample = tf.stop_gradient(sample) # treat sample as a constant and do not backpropagate through it
+            max_idx = tf.argmax(sample, axis=1) # select argmax of the sample along last dimension
+            m, v = tf.gather(m, max_idx, axis=1, batch_dims=1), tf.gather(v, max_idx, axis=1, batch_dims=1)
+            x_out_mean, x_out_var = tf.reshape(m, [N, H // pool_H, W // pool_W, C]), tf.reshape(v, [N, H // pool_H, W // pool_W, C]) # convert back to NHWC
         else:
             raise NotImplementedError('DistPool2D: Pooling mode \'{}\' not implemented'.format(self.mode))
-            
+
         return x_out_mean, x_out_var
 
 
     def call_predict(self, x_in):
-        assert self.mode in ['MAX', 'MAX_SIGN']
+        assert self.mode in ['MAX', 'MAX_SIGN', 'MAX_MEAN', 'MAX_SAMPLE']
         return tf.nn.max_pool(x_in, self.pool_size, self.strides, padding=self.padding, data_format=self.data_format)
