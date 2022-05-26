@@ -1,6 +1,7 @@
 import tensorflow as tf
 
-from layers.ste import sign_ste_id # TODO: get rid of 'layers.' prefix
+from .ste import sign_ste_id
+
 
 class DistReparameterization(tf.keras.layers.Layer):
 
@@ -13,7 +14,7 @@ class DistReparameterization(tf.keras.layers.Layer):
         mode = mode.upper()
         assert mode in ['NORMAL', 'GUMBEL_SOFTMAX_SIGN', 'GUMBEL_SOFTMAX_BINARY']
         self.mode = mode
-        self.gumbel_softmax_temperature = 1.0
+        self.gumbel_softmax_temperature = gumbel_softmax_temperature
         self.enable_straight_through_estimator = enable_straight_through_estimator
         self.epsilon = epsilon
 
@@ -26,6 +27,7 @@ class DistReparameterization(tf.keras.layers.Layer):
             else:
                 return self.call_train_deterministic(x)
         else:
+            assert not isinstance(x, tuple)
             return self.call_predict(x)
 
 

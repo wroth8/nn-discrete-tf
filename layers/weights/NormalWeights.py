@@ -1,9 +1,9 @@
-import tensorflow as tf
 import math
 import numpy as np
+import tensorflow as tf
 
-# from WeightType import WeightType
-from layers.weights.WeightType import WeightType # TODO: Check why we have to specify the whole path and cannot leave out 'layers.weights.'
+from .WeightType import WeightType
+
 
 class NormalWeights(WeightType):
 

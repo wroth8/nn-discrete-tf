@@ -36,7 +36,7 @@ class DistConv2D(tf.keras.layers.Layer):
             if self.use_bias:
                 self.bias = tf.Variable(tf.zeros(shape=(self.channels_out,)))
         else:
-            raise NotImplementedError('DistConv2D: Data format \'{}\' not implemented'.format(data_format))
+            raise NotImplementedError('DistConv2D: Data format \'{}\' not implemented'.format(self.data_format))
 
 
     def call(self, x, training, use_sampled_weights=False):
@@ -49,6 +49,7 @@ class DistConv2D(tf.keras.layers.Layer):
             else:
                 return self.call_train_deterministic(x)
         else:
+            assert not isinstance(x, tuple)
             return self.call_predict(x, use_sampled_weights=use_sampled_weights)
 
 

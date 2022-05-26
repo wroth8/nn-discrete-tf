@@ -1,5 +1,5 @@
-import tensorflow as tf
 import math
+import tensorflow as tf
 
 
 def maxOfGaussians(m1, v1, m2, v2, epsilon=1e-6):
@@ -135,6 +135,7 @@ class DistPool2D(tf.keras.layers.Layer):
             else:
                 return self.call_train_deterministic(x, enable_ema_updates)
         else:
+            assert not isinstance(x, tuple)
             return self.call_predict(x)
 
 

@@ -1,19 +1,24 @@
-import tensorflow as tf
+'''
+Example script for running a training on Cifar-10 using real weights and
+activations.
+'''
+
 import numpy as np
+import tensorflow as tf
 
 from time import time
 
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Softmax
 
-from layers.DistDropout import DistDropout
+from layers.DistBatchNormalization import DistBatchNormalization
 from layers.DistConv2D import DistConv2D
 from layers.DistDense import DistDense
-from layers.DistBatchNormalization import DistBatchNormalization
+from layers.DistDropout import DistDropout
+from layers.DistFlatten import DistFlatten
 from layers.DistPool2D import DistPool2D
 from layers.DistReLU import DistReLU
-from layers.DistFlatten import DistFlatten
-
+from layers.DistTanh import DistTanh
 from layers.weights.RealWeights import RealWeights
 
 #-----------------------------------------------------------------------------------------------------------------------

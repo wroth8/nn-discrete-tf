@@ -70,7 +70,7 @@ def initialize_probabilities_from_expectation(w_expect, w_values, new_dim=-1, q_
     q_values[idx2, -1] = q_init_min + slope[-1] * (w_expect[idx2] - w_values[-2])
     
     if new_dim != -1:
-        q_values = np.swapaxes(q_values, -1, n_dim)
+        q_values = np.swapaxes(q_values, -1, new_dim)
     
     return q_values
 

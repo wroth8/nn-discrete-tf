@@ -1,7 +1,10 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
 from layers.weights.initializers import initialize_probabilities_from_expectation
 from layers.weights.initializers import initialize_shayer_probabilities_from_expectation
+
+save_figures = True
 
 w_expect_init = np.linspace(-1.5, 1.5, 200)
 
@@ -21,6 +24,8 @@ ax.plot(w_expect_init, w_expect - w_expect_init, 'k-.')
 ax.legend(['q(w=-1)', 'q(w=0)', 'q(w=1)', 'Delta E'])
 ax.set_title('Roth Initialization: Ternary')
 plt.show()
+if save_figures:
+    f.savefig("init_roth_ternary.png")
 
 # Initialize quinary probabilities using the method of Roth [1].
 # [1] W. Roth, G. Schindler, H. Fr{\"o}ning, F. Pernkopf;
@@ -40,6 +45,8 @@ ax.plot(w_expect_init, w_expect - w_expect_init, 'k-.')
 ax.legend(['q(w=-1)', 'q(w=-0.5)', 'q(w=0)', 'q(w=0.5)', 'q(w=1)', 'Delta E'])
 ax.set_title('Roth Initialization: Quinary')
 plt.show()
+if save_figures:
+    f.savefig("init_roth_quinary.png")
 
 # Initialize ternary probabilities using the method of Shayer [2].
 # [2] O. Shayer, D. Levi, E. Fetaya:;
@@ -60,6 +67,8 @@ ax.plot(w_expect_init, w_expect - w_expect_init, 'k-.')
 ax.legend(['q(w=-1)', 'q(w=0)', 'q(w=1)', 'q(w=1|w!=0)', 'Delta E'])
 ax.set_title('Shayer Initialization: Ternary')
 plt.show()
+if save_figures:
+    f.savefig("init_shayer_ternary.png")
 
 # Initialize binary probabilities using the method of Shayer [2].
 # [2] O. Shayer, D. Levi, E. Fetaya:;
@@ -75,3 +84,5 @@ ax.plot(w_expect_init, w_expect - w_expect_init, 'k-.')
 ax.legend(['q(w=1)', 'Delta E'])
 ax.set_title('Shayer Initialization: Binary')
 plt.show()
+if save_figures:
+    f.savefig("init_shayer_binary.png")

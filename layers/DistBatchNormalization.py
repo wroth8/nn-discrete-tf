@@ -1,8 +1,8 @@
 import tensorflow as tf
 
-from tensorflow.python.ops.state_ops import assign
-from tensorflow.python.ops.state_ops import assign_sub
 from tensorflow.python.ops.nn_impl import fused_batch_norm
+from tensorflow.python.ops.state_ops import assign_sub
+# from tensorflow.python.ops.state_ops import assign
 
 
 class DistBatchNormalization(tf.keras.layers.Layer):
@@ -60,6 +60,7 @@ class DistBatchNormalization(tf.keras.layers.Layer):
             else:
                 return self.call_train_deterministic(x, enable_ema_updates)
         else:
+            assert not isinstance(x, tuple)
             assert enable_ema_updates == False
             return self.call_predict(x)
 

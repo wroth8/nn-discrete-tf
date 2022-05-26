@@ -1,21 +1,27 @@
-import tensorflow as tf
+'''
+Example script for running a training on MNIST using binary weights and
+activations using the straight-through gradient estimator.
+'''
+
 import numpy as np
+import tensorflow as tf
 
 from time import time
 
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Softmax
 
-from layers.DistDropout import DistDropout
-from layers.DistDense import DistDense
 from layers.DistBatchNormalization import DistBatchNormalization
+from layers.DistDense import DistDense
+from layers.DistDropout import DistDropout
 from layers.DistReLU import DistReLU
 from layers.DistSign import DistSign
-
-from layers.weights.RealWeights import RealWeights
-from layers.weights.QuantizedWeightsStraightThrough import QuantizedWeightsStraightThrough
 from layers.ste import sign0_ste_id
+from layers.weights.QuantizedWeightsStraightThrough import QuantizedWeightsStraightThrough
+from layers.weights.RealWeights import RealWeights
 
+#-----------------------------------------------------------------------------------------------------------------------
+# Fully connected model with support for quantized weights and activations using the straight-through gradient estimator
 class MnistFullyConnectedNN(Model):
     def __init__(self,
                  weight_type='real',
@@ -151,10 +157,10 @@ test_loss = tf.keras.metrics.Mean(name='test_loss')
 test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
 
 if enable_binary_weights and enable_binary_activations:
-    learning_rate_variable = tf.Variable(3e-3, tf.float32) # suitable for real weights and relu activation
+    learning_rate_variable = tf.Variable(3e-3, tf.float32) # suitable for binary weights and binary activation
     learning_rate_schedule = np.logspace(np.log10(3e-3), np.log10(3e-7), 1000)
 else:
-    learning_rate_variable = tf.Variable(3e-4, tf.float32) # suitable for real weights and relu activation
+    learning_rate_variable = tf.Variable(3e-4, tf.float32) # suitable for real weights and/or relu activation
     learning_rate_schedule = np.arange(0.0, 10.0).reshape(-1, 1) # decrease every 250 iterations by factor of 10
     learning_rate_schedule = np.repeat(learning_rate_schedule, 250, axis=1).reshape(-1)
     learning_rate_schedule = 3e-4 * (10 ** -learning_rate_schedule)

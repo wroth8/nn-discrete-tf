@@ -1,20 +1,25 @@
-import tensorflow as tf
+'''
+Example script for running a training on Cifar-10 using discrete weights and
+sign activations. It is best to run `example_cifar10_real.py` in advance so that
+this script can load a pre-trained real-valued model.
+'''
+
 import numpy as np
+import tensorflow as tf
 
 from time import time
 
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Softmax
 
-from layers.DistDropout import DistDropout
+from layers.DistBatchNormalization import DistBatchNormalization
 from layers.DistConv2D import DistConv2D
 from layers.DistDense import DistDense
+from layers.DistDropout import DistDropout
+from layers.DistFlatten import DistFlatten
 from layers.DistReparameterization import DistReparameterization
-from layers.DistBatchNormalization import DistBatchNormalization
 from layers.DistPool2D import DistPool2D
 from layers.DistSign import DistSign
-from layers.DistFlatten import DistFlatten
-
 from layers.weights.RealWeights import RealWeights
 from layers.weights.TernaryWeights import TernaryWeights
 
@@ -37,7 +42,7 @@ class VggSign32x32(Model):
         elif initial_weight_type == 'ternary':
             create_weight_type = lambda : TernaryWeights(regularize_shayer=regularize_weights_shayer)
         else:
-            raise NotImplementedError('Weighty type \'{}\' not implemented'.format(weight_type))
+            raise NotImplementedError('Weight type \'{}\' not implemented'.format(initial_weight_type))
         
         create_activation = lambda : DistSign()
 

@@ -10,7 +10,7 @@ class DistDropout(tf.keras.layers.Layer):
         Dropout Layer:
           @see Nitish Srivastava, Geoffrey Hinton, Alex Krizhevsky, Ilya Sutskever, Ruslan Salakhutdinov;
                Dropout: A Simple Way to Prevent Neural Networks from Overfitting
-               JMLR 15(Jun):1929−1958, 2014
+               JMLR 15(Jun):1929--1958, 2014
         
         Arguments:
         dropout_rate: The probability of an input being set to zero.
@@ -33,6 +33,7 @@ class DistDropout(tf.keras.layers.Layer):
             else:
                 return self.call_train_deterministic(x)
         else:
+            assert not isinstance(x, tuple)
             return self.call_predict(x)
 
 

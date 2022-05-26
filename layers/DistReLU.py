@@ -1,5 +1,5 @@
-import tensorflow as tf
 import math
+import tensorflow as tf
 
 
 def reluOfGaussian(m, v, epsilon=1e-6):

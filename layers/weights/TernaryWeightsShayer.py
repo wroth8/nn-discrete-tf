@@ -1,10 +1,9 @@
 import tensorflow as tf
-import math
 import numpy as np
 
-# from WeightType import WeightType
-from layers.weights.WeightType import WeightType # TODO: Check why we have to specify the whole path and cannot leave out 'layers.weights.'
-from layers.weights.initializers import initialize_probabilities_from_expectation, initialize_shayer_probabilities_from_expectation, map_to_ecdf
+from .initializers import initialize_probabilities_from_expectation, initialize_shayer_probabilities_from_expectation, map_to_ecdf
+from .WeightType import WeightType
+
 
 class TernaryWeightsShayer(WeightType):
 

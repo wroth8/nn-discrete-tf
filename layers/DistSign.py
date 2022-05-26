@@ -1,10 +1,8 @@
 import tensorflow as tf
-import math
 
-# TODO: see if we can remove the full path 'layers.ste'
-from layers.ste import sign0_ste_id, sign0_ste_tanh, sign0_ste_hardtanh, \
-                       sign_ste_id, sign_ste_tanh, sign_ste_hardtanh, \
-                       sign_stoch_ste_id, sign_stoch_ste_tanh, sign_stoch_ste_hardtanh
+from .ste import sign0_ste_id, sign0_ste_tanh, sign0_ste_hardtanh, \
+                 sign_ste_id, sign_ste_tanh, sign_ste_hardtanh, \
+                 sign_stoch_ste_id, sign_stoch_ste_tanh, sign_stoch_ste_hardtanh
 
 
 def signOfGaussian(m, v, epsilon=1e-6):
