@@ -83,7 +83,7 @@ class QuaternaryWeights(WeightType):
 
     def variance(self):
         q = self.probabilities()
-        w_mean = -q[..., 0] + (q[..., 2] - q[..., 1]) * (1.0 / 3.0) + q[..., 2]
+        w_mean = -q[..., 0] + (q[..., 2] - q[..., 1]) * (1.0 / 3.0) + q[..., 3]
         w_var = (q[..., 0] * tf.square(1.0 + w_mean) +
                  q[..., 1] * tf.square(1.0 / 3.0 + w_mean) +
                  q[..., 2] * tf.square(1.0 / 3.0 - w_mean) +
