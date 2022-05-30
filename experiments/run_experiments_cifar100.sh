@@ -117,7 +117,7 @@ create_dirs cifar100 $EXPERIMENT_DIR
         --lr-schedule-reduce-every=100 \
         --reg-logits-l2=1e-10 \
         --batchnorm-momentum=0.9 \
-        --batchnorm-reestimation=100
+        --batchnorm-reestimation=100 \
             | tee results/cifar100/$EXPERIMENT_DIR/logs/log$TASK_ID_AUX.out) 3>&1 1>&2 2>&3 \
             | tee results/cifar100/$EXPERIMENT_DIR/logs/log$TASK_ID_AUX.err
 
